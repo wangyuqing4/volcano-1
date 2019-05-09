@@ -257,46 +257,6 @@ func TestApplyPolicies(t *testing.T) {
 		ReturnVal v1alpha1.Action
 	}{
 		{
-			Name: "Test Apply policies where Action is not empty",
-			Job: &v1alpha1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "job1",
-					Namespace: namespace,
-				},
-				Spec: v1alpha1.JobSpec{
-					SchedulerName: "volcano",
-					Tasks: []v1alpha1.TaskSpec{
-						{
-							Name:     "task1",
-							Replicas: 6,
-							Template: v1.PodTemplateSpec{
-								ObjectMeta: metav1.ObjectMeta{
-									Name:      "pods",
-									Namespace: namespace,
-								},
-								Spec: v1.PodSpec{
-									Containers: []v1.Container{
-										{
-											Name: "Containers",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Status: v1alpha1.JobStatus{
-					ControlledResources: map[string]string{
-						"volume-emptyDir-vc1": "vc1",
-					},
-				},
-			},
-			Request: &apis.Request{
-				Action: v1alpha1.EnqueueAction,
-			},
-			ReturnVal: v1alpha1.EnqueueAction,
-		},
-		{
 			Name: "Test Apply policies where event is OutOfSync",
 			Job: &v1alpha1.Job{
 				ObjectMeta: metav1.ObjectMeta{

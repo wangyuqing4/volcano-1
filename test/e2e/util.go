@@ -53,6 +53,7 @@ var (
 	oneMinute = 1 * time.Minute
 	twoMinute = 2 * time.Minute
 	oneCPU    = v1.ResourceList{"cpu": resource.MustParse("1000m")}
+	thirtyCPU = v1.ResourceList{"cpu": resource.MustParse("30000m")}
 )
 
 const (
@@ -516,8 +517,6 @@ func waitJobPhases(ctx *context, job *vkv1.Job, phases []vkv1.JobPhase) error {
 					newJob.Status.Terminating == 0
 			case vkv1.Running:
 				flag = newJob.Status.Running >= newJob.Spec.MinAvailable
-			case vkv1.Inqueue:
-				flag = newJob.Status.Pending > 0
 			default:
 				return fmt.Errorf("unknown phase %s", phase)
 			}
@@ -569,9 +568,7 @@ func waitJobPhase(ctx *context, job *vkv1.Job, phase vkv1.JobPhase) error {
 		var flag = false
 		switch phase {
 		case vkv1.Pending:
-			flag = (newJob.Status.Pending+newJob.Status.Succeeded+
-				newJob.Status.Failed+newJob.Status.Running) == 0 ||
-				(total-newJob.Status.Terminating >= newJob.Status.MinAvailable)
+			flag = newJob.Status.Pending > 0
 		case vkv1.Terminating, vkv1.Aborting, vkv1.Restarting:
 			flag = newJob.Status.Terminating > 0
 		case vkv1.Terminated, vkv1.Aborted:
@@ -582,8 +579,6 @@ func waitJobPhase(ctx *context, job *vkv1.Job, phase vkv1.JobPhase) error {
 			flag = newJob.Status.Succeeded == state.TotalTasks(newJob)
 		case vkv1.Running:
 			flag = newJob.Status.Running >= newJob.Spec.MinAvailable
-		case vkv1.Inqueue:
-			flag = newJob.Status.Pending > 0
 		default:
 			return false, fmt.Errorf("unknown phase %s", phase)
 		}
@@ -631,10 +626,6 @@ func waitJobStateReady(ctx *context, job *vkv1.Job) error {
 
 func waitJobStatePending(ctx *context, job *vkv1.Job) error {
 	return waitJobPhaseExpect(ctx, job, vkv1.Pending)
-}
-
-func waitJobStateInqueue(ctx *context, job *vkv1.Job) error {
-	return waitJobPhaseExpect(ctx, job, vkv1.Inqueue)
 }
 
 func waitJobStateAborted(ctx *context, job *vkv1.Job) error {
