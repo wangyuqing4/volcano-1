@@ -112,7 +112,7 @@ func (alloc *preemptAction) Execute(ssn *framework.Session) {
 
 				preemptor := preemptorTasks[preemptorJob.UID].Pop().(*api.TaskInfo)
 
-				if preempted, _ := preempt(ssn, stmt, preemptor, func(task *api.TaskInfo) bool {
+				if preempted := preempt(ssn, stmt, preemptor, func(task *api.TaskInfo) bool {
 					// Ignore non running task.
 					if task.Status != api.Running {
 						return false
@@ -156,7 +156,7 @@ func (alloc *preemptAction) Execute(ssn *framework.Session) {
 				preemptor := preemptorTasks[job.UID].Pop().(*api.TaskInfo)
 
 				stmt := ssn.Statement()
-				assigned, _ := preempt(ssn, stmt, preemptor, func(task *api.TaskInfo) bool {
+				assigned := preempt(ssn, stmt, preemptor, func(task *api.TaskInfo) bool {
 					// Ignore non running task.
 					if task.Status != api.Running {
 						return false
@@ -183,7 +183,7 @@ func preempt(
 	stmt *framework.Statement,
 	preemptor *api.TaskInfo,
 	filter func(*api.TaskInfo) bool,
-) (bool, error) {
+) bool {
 	assigned := false
 
 	allNodes := util.GetNodeList(ssn.Nodes)
@@ -217,6 +217,7 @@ func preempt(
 			return !ssn.TaskOrderFn(l, r)
 		})
 		for _, victim := range victims {
+			klog.V(3).Infof("=========func preempt after validateVictims victim name: %v", victim.Name)
 			victimsQueue.Push(victim)
 		}
 		// Preempt victims for tasks, pick lowest priority task first.
@@ -225,6 +226,7 @@ func preempt(
 		for !victimsQueue.Empty() {
 			// If reclaimed enough resources, break loop to avoid Sub panic.
 			if preemptor.InitResreq.LessEqual(node.FutureIdle()) {
+				klog.V(3).Infof("break stmt.Evict preemptor.InitResreq: <%v>, node.FutureIdle(): <%v>", preemptor.InitResreq, node.FutureIdle())
 				break
 			}
 			preemptee := victimsQueue.Pop().(*api.TaskInfo)
@@ -255,7 +257,7 @@ func preempt(
 		}
 	}
 
-	return assigned, nil
+	return assigned
 }
 
 func validateVictims(preemptor *api.TaskInfo, node *api.NodeInfo, victims []*api.TaskInfo) error {

@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"k8s.io/klog"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
 	"volcano.sh/volcano/pkg/scheduler/api"
@@ -146,6 +147,7 @@ func (ssn *Session) Reclaimable(reclaimer *api.TaskInfo, reclaimees []*api.TaskI
 
 // Preemptable invoke preemptable function of the plugins
 func (ssn *Session) Preemptable(preemptor *api.TaskInfo, preemptees []*api.TaskInfo) []*api.TaskInfo {
+	var totalPersistTasks []*api.TaskInfo
 	var victims []*api.TaskInfo
 	var init bool
 
@@ -159,30 +161,45 @@ func (ssn *Session) Preemptable(preemptor *api.TaskInfo, preemptees []*api.TaskI
 			if !found {
 				continue
 			}
-			candidates := pf(preemptor, preemptees)
+			persistTasks := pf(preemptor, preemptees)
+
 			if !init {
-				victims = candidates
+				totalPersistTasks = persistTasks
 				init = true
 			} else {
-				var intersection []*api.TaskInfo
-				// Get intersection of victims and candidates.
-				for _, v := range victims {
-					for _, c := range candidates {
+				for _, v := range persistTasks {
+					found := false
+					for _, c := range totalPersistTasks {
 						if v.UID == c.UID {
-							intersection = append(intersection, v)
+							found = true
 						}
 					}
+					if !found {
+						totalPersistTasks = append(totalPersistTasks, v)
+					}
 				}
-
-				// Update victims to intersection
-				victims = intersection
 			}
 		}
-		// Plugins in this tier made decision if victims is not nil
-		if victims != nil {
-			return victims
+
+		if len(totalPersistTasks) == len(preemptees) {
+			klog.V(3).Infof("---------Preemptable all tasks are totalPersistTasks--------")
+			return nil
 		}
 	}
+
+	for _, v := range preemptees {
+		found := false
+		for _, c := range totalPersistTasks {
+			if v.UID == c.UID {
+				found = true
+			}
+		}
+		if !found {
+			victims = append(victims, v)
+		}
+	}
+
+	klog.V(3).Infof("---------in Preemptable victims <%v>--------")
 
 	return victims
 }

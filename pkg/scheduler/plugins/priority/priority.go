@@ -85,20 +85,19 @@ func (pp *priorityPlugin) OnSessionOpen(ssn *framework.Session) {
 	preemptableFn := func(preemptor *api.TaskInfo, preemptees []*api.TaskInfo) []*api.TaskInfo {
 		preemptorJob := ssn.Jobs[preemptor.Job]
 
-		var victims []*api.TaskInfo
+		var persistTasks []*api.TaskInfo
 		for _, preemptee := range preemptees {
 			preempteeJob := ssn.Jobs[preemptee.Job]
-			if preempteeJob.Priority >= preemptorJob.Priority {
-				klog.V(4).Infof("Can not preempt task <%v/%v> because "+
-					"preemptee has greater or equal job priority (%d) than preemptor (%d)",
+			if preempteeJob.Priority > preemptorJob.Priority {
+				klog.V(3).Infof("Can not preempt task <%v/%v> because "+
+					"preemptee has greater job priority (%d) than preemptor (%d)",
 					preemptee.Namespace, preemptee.Name, preempteeJob.Priority, preemptorJob.Priority)
-			} else {
-				victims = append(victims, preemptee)
+				persistTasks = append(persistTasks, preemptee)
 			}
 		}
 
-		klog.V(4).Infof("Victims from Priority plugins are %+v", victims)
-		return victims
+		klog.V(4).Infof("persistTasks from Priority plugins are %+v", persistTasks)
+		return persistTasks
 	}
 
 	ssn.AddPreemptableFn(pp.Name(), preemptableFn)

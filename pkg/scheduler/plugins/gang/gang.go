@@ -71,7 +71,7 @@ func (gp *gangPlugin) OnSessionOpen(ssn *framework.Session) {
 
 	ssn.AddJobValidFn(gp.Name(), validJobFn)
 
-	preemptableFn := func(preemptor *api.TaskInfo, preemptees []*api.TaskInfo) []*api.TaskInfo {
+	reclaimableFn := func(preemptor *api.TaskInfo, preemptees []*api.TaskInfo) []*api.TaskInfo {
 		var victims []*api.TaskInfo
 
 		for _, preemptee := range preemptees {
@@ -92,8 +92,30 @@ func (gp *gangPlugin) OnSessionOpen(ssn *framework.Session) {
 		return victims
 	}
 
+	preemptableFn := func(preemptor *api.TaskInfo, preemptees []*api.TaskInfo) []*api.TaskInfo {
+		var persistTasks []*api.TaskInfo
+
+		for _, preemptee := range preemptees {
+			job := ssn.Jobs[preemptee.Job]
+			persistent := job.ReadyTaskNum() <= job.MinAvailable && job.MinAvailable != 1
+
+			klog.V(3).Infof("----------------preemptable: <%v> preempt task <%v/%v> because of gang-scheduling",
+				persistent, preemptee.Namespace, preemptee.Name)
+
+			if persistent{
+				klog.V(4).Infof("Can not preempt task <%v/%v> because of gang-scheduling",
+					preemptee.Namespace, preemptee.Name)
+				persistTasks = append(persistTasks, preemptee)
+			}
+		}
+
+		klog.V(4).Infof("persistTasks from Gang plugins are %+v", persistTasks)
+
+		return persistTasks
+	}
+
 	// TODO(k82cn): Support preempt/reclaim batch job.
-	ssn.AddReclaimableFn(gp.Name(), preemptableFn)
+	ssn.AddReclaimableFn(gp.Name(), reclaimableFn)
 	ssn.AddPreemptableFn(gp.Name(), preemptableFn)
 
 	jobOrderFn := func(l, r interface{}) int {

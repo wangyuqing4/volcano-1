@@ -125,6 +125,7 @@ func (drf *drfPlugin) OnSessionOpen(ssn *framework.Session) {
 		}
 
 		if namespaceOrderEnabled {
+			klog.V(3).Infof("-------------------enter drf namespaceOrderEnabled--------------")
 			// apply the namespace share policy on preemptee firstly
 
 			lWeight := ssn.NamespaceInfo[api.NamespaceName(preemptor.Namespace)].GetWeight()
@@ -172,6 +173,10 @@ func (drf *drfPlugin) OnSessionOpen(ssn *framework.Session) {
 			}
 
 			preemptees = undecidedPreemptees
+
+			for _, preemptee := range preemptees {
+				klog.V(3).Infof("-------------------enter drf namespaceOrderEnabled preemptee name: %v", preemptee.Name)
+			}
 		}
 
 		latt := drf.jobAttrs[preemptor.Job]
@@ -187,15 +192,30 @@ func (drf *drfPlugin) OnSessionOpen(ssn *framework.Session) {
 			}
 			ralloc := allocations[preemptee.Job].Sub(preemptee.Resreq)
 			_, rs := drf.calculateShare(ralloc, drf.totalResource)
+			klog.V(3).Infof("-------------drf preemptee name: %v, ls<%v>, rs<%v>", preemptee.Name, ls, rs)
 
 			if ls < rs || math.Abs(ls-rs) <= shareDelta {
+				klog.V(3).Infof("-------------drf preemptee name: %v enter addVictim", preemptee.Name)
 				addVictim(preemptee)
 			}
 		}
 
-		klog.V(4).Infof("Victims from DRF plugins are %+v", victims)
+		klog.V(3).Infof("Victims from DRF plugins are %+v", victims)
 
-		return victims
+		var totalPersistTasks []*api.TaskInfo
+		for _, v := range preemptees {
+			found := false
+			for _, c := range victims {
+				if v.UID == c.UID {
+					found = true
+				}
+			}
+			if !found {
+				totalPersistTasks = append(totalPersistTasks, v)
+			}
+		}
+
+		return totalPersistTasks
 	}
 
 	ssn.AddPreemptableFn(drf.Name(), preemptableFn)

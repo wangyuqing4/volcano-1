@@ -61,7 +61,23 @@ func (pp *conformancePlugin) OnSessionOpen(ssn *framework.Session) {
 		return victims
 	}
 
-	ssn.AddPreemptableFn(pp.Name(), evictableFn)
+	preemptableFn := func(evictor *api.TaskInfo, evictees []*api.TaskInfo) []*api.TaskInfo {
+		var persistTasks []*api.TaskInfo
+
+		for _, evictee := range evictees {
+			className := evictee.Pod.Spec.PriorityClassName
+			// Skip critical pod.
+			if className == scheduling.SystemClusterCritical ||
+				className == scheduling.SystemNodeCritical ||
+				evictee.Namespace == v1.NamespaceSystem {
+				persistTasks = append(persistTasks, evictee)
+			}
+		}
+
+		return persistTasks
+	}
+
+	ssn.AddPreemptableFn(pp.Name(), preemptableFn)
 	ssn.AddReclaimableFn(pp.Name(), evictableFn)
 }
 
